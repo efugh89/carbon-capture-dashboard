@@ -1,1 +1,1 @@
-# carbon-capture-dashboard
+# Carbon Capture Dashboard
