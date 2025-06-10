@@ -1,0 +1,441 @@
+---
+title: "google_places"
+format: html
+editor: visual
+---
+
+```{r}
+# files
+library("readxl") # to read the xlsx files
+
+uu <- read_excel("C:/Users/Emily/OneDrive/Documents/GitHub/24-fall-EFUGH/Fugh_Capstone/data/ghgp_data_2022.xlsx", 
+                 sheet = "CO2 Injection", 
+                 skip=3,
+                 col_names = TRUE)
+
+rr <- read_excel("C:/Users/Emily/OneDrive/Documents/GitHub/24-fall-EFUGH/Fugh_Capstone/data/ghgp_data_2022.xlsx", 
+                 sheet = "Geologic Sequestration of CO2", 
+                 skip=3,
+                 col_names = TRUE)
+
+seq <- subset(rbind(uu,rr),select=c(1,9,10))
+
+library("googleway") 
+library("ggmap")
+
+key <- "AIzaSyCfFzakx2Ntztl6eGp3nHpvFa20rmw5xd0"
+set_key(key)
+register_google(key)
+
+site <- seq[2,]
+site$`Facility Id` <- as.character(site$`Facility Id`)
+
+r <- 32186.88 
+```
+
+```{r}
+library("googleway")
+library("ggmap")
+key <- "AIzaSyCfFzakx2Ntztl6eGp3nHpvFa20rmw5xd0"
+set_key(key)
+register_google(key)
+
+library("rSHAPE")
+library("dplyr")
+library("geosphere")
+library("plyr")
+```
+
+```{r}
+locations <- data.frame(
+    lat = numeric(),
+    lng = numeric(),
+    type = factor(),
+    distance = numeric(),
+    site = factor()
+  )
+```
+
+```{r}
+for (a in 1:nrow(seq)) {
+  site <- seq[a,]
+  
+  category <- c("hospital","pharmacy","health","doctor")
+  medical <- data.frame(
+    lat = numeric(),
+    lng = numeric(),
+    type = character(),
+    distance = numeric()
+  )
+  
+  for (i in category) {
+    request <- google_places(
+      location=c(site$Latitude,site$Longitude),
+      rankby='distance',
+      place_type=i)
+    medical <- rbind(request$results$geometry$location,medical)
+    
+    while (exists(addQuotes(request$next_place_token))) {
+      request <- google_places(
+      location=c(site$Latitude,site$Longitude),
+      rankby='distance',
+      place_type=i,
+      page_token=request$next_page_token)
+      
+      medical <- rbind(request$results$geometry$location,medical)
+    }
+  }
+  
+  if (nrow(medical)>0) {
+    medical$type <- c("Medical")
+    medical$distance <- distHaversine(cbind(medical$lng,medical$lat), 
+                                      cbind(site$Longitude,site$Latitude))
+    colnames(medical) <- c("lat","lng","type","distance")
+    medical <- medical[!duplicated(medical),]
+    medical$site <- site$`Facility Id`
+    medical <- subset(medical,medical$distance<=r)
+    locations <- rbind(medical,locations) 
+  }
+}
+```
+
+```{r}
+for (a in 1:nrow(seq)) {
+  site <- seq[a,]
+  
+  category <- c("school","secondary_school","university")
+  schools <- data.frame(
+    lat = numeric(),
+    lng = numeric(),
+    type = character(),
+    distance = numeric()
+  )
+  
+  for (i in category) {
+    request <- google_places(
+      location=c(site$Latitude,site$Longitude),
+      rankby='distance',
+      place_type=i)
+    schools <- rbind(request$results$geometry$location,schools)
+    
+    while (exists(addQuotes(request$next_place_token))) {
+      request <- google_places(
+      location=c(site$Latitude,site$Longitude),
+      rankby='distance',
+      place_type=i,
+      page_token=request$next_page_token)
+      
+      schools <- rbind(request$results$geometry$location,schools)
+    }
+  }
+  
+  if (nrow(schools)>0) {
+    schools$type <- c("Schools")
+    schools$distance <- distHaversine(cbind(schools$lng,schools$lat), 
+                                      cbind(site$Longitude,site$Latitude))
+    colnames(schools) <- c("lat","lng","type","distance")
+    schools <- schools[!duplicated(schools),]
+    schools$site <- site$`Facility Id`
+    schools <- subset(schools,schools$distance<=r)
+    locations <- rbind(schools,locations) 
+  }
+}
+```
+
+```{r}
+for (a in 1:nrow(seq)) {
+  site <- seq[a,]
+  
+  category <- c("transit_station","train_station","light_rail_station","gas_station",
+              "airport")
+  transport <- data.frame(
+    lat = numeric(),
+    lng = numeric(),
+    type = character(),
+    distance = numeric()
+  )
+  
+  for (i in category) {
+    request <- google_places(
+      location=c(site$Latitude,site$Longitude),
+      rankby='distance',
+      place_type=i)
+    transport <- rbind(request$results$geometry$location,transport)
+    
+    while (exists(addQuotes(request$next_place_token))) {
+      request <- google_places(
+      location=c(site$Latitude,site$Longitude),
+      rankby='distance',
+      place_type=i,
+      page_token=request$next_page_token)
+      
+      transport <- rbind(request$results$geometry$location,transport)
+    }
+  }
+  
+  if (nrow(transport)>0) {
+    transport$type <- c("Transportation")
+    transport$distance <- distHaversine(cbind(transport$lng,transport$lat),                                            cbind(site$Longitude,site$Latitude))
+    
+    colnames(transport) <- c("lat","lng","type","distance")
+    transport <- transport[!duplicated(transport),]
+    transport$site <- site$`Facility Id`
+    transport <- subset(transport,transport$distance<=r)
+    locations <- rbind(transport,locations)
+  }
+  
+}
+```
+
+```{r}
+for (a in 1:nrow(seq)) {
+  site <- seq[a,]
+  
+  category <- c("bakery","shopping_mall","supermarket","store",
+              "convenience_store","department_store")
+  stores <- data.frame(
+    lat = numeric(),
+    lng = numeric(),
+    type = character(),
+    distance = numeric()
+  )
+  
+  for (i in category) {
+    request <- google_places(
+      location=c(site$Latitude,site$Longitude),
+      rankby='distance',
+      place_type=i)
+    stores <- rbind(request$results$geometry$location,stores)
+    
+    while (exists(addQuotes(request$next_place_token))) {
+      request <- google_places(
+      location=c(site$Latitude,site$Longitude),
+      rankby='distance',
+      place_type=i,
+      page_token=request$next_page_token)
+      
+      stores <- rbind(request$results$geometry$location,stores)
+    }
+  }
+  
+  if (nrow(stores)>0) {
+    stores$type <- c("Stores")
+    stores$distance <- distHaversine(cbind(stores$lng,stores$lat),                                            cbind(site$Longitude,site$Latitude))
+    
+    colnames(stores) <- c("lat","lng","type","distance")
+    stores <- stores[!duplicated(stores),]
+    stores$site <- site$`Facility Id`
+    stores <- subset(stores,stores$distance<=r)
+    locations <- rbind(stores,locations)
+  }
+  
+}
+```
+
+```{r}
+for (a in 1:nrow(seq)) {
+  site <- seq[a,]
+  
+  category <- c("cafe","restuarant","gym","club","bar","zoo","laundry","library",
+              "rv_park","park","lodging","campground")
+  social <- data.frame(
+    lat = numeric(),
+    lng = numeric(),
+    type = character(),
+    distance = numeric()
+  )
+  
+  for (i in category) {
+    request <- google_places(
+      location=c(site$Latitude,site$Longitude),
+      rankby='distance',
+      place_type=i)
+    social <- rbind(request$results$geometry$location,social)
+    
+    while (exists(addQuotes(request$next_place_token))) {
+      request <- google_places(
+      location=c(site$Latitude,site$Longitude),
+      rankby='distance',
+      place_type=i,
+      page_token=request$next_page_token)
+      
+      social <- rbind(request$results$geometry$location,social)
+    }
+  }
+
+  if (nrow(social)>0) {
+    social$type <- c("Social Locations")
+    social$distance <- distHaversine(cbind(social$lng,social$lat),                                            cbind(site$Longitude,site$Latitude))
+    
+    colnames(social) <- c("lat","lng","type","distance")
+    social <- social[!duplicated(social),]
+    social$site <- site$`Facility Id`
+    social <- subset(social,social$distance<=r)
+    locations <- rbind(social,locations)
+  }  
+}
+```
+
+```{r}
+for (a in 1:nrow(seq)) {
+  site <- seq[a,]
+  
+  category <- c("synagogue","church","hindu_temple","mosque","place_of_worship")
+  religious <- data.frame(
+    lat = numeric(),
+    lng = numeric(),
+    type = character(),
+    distance = numeric()
+  )
+  
+  for (i in category) {
+    request <- google_places(
+      location=c(site$Latitude,site$Longitude),
+      rankby='distance',
+      place_type=i)
+    religious <- rbind(request$results$geometry$location,religious)
+    
+    while (exists(addQuotes(request$next_place_token))) {
+      request <- google_places(
+      location=c(site$Latitude,site$Longitude),
+      rankby='distance',
+      place_type=i,
+      page_token=request$next_page_token)
+      
+      religious <- rbind(request$results$geometry$location,religious)
+    }
+  }
+  
+  if (nrow(religious)>0) {
+    religious$type <- c("Places of Worship")
+    religious$distance <- distHaversine(cbind(religious$lng,religious$lat),                                            cbind(site$Longitude,site$Latitude))
+    
+    colnames(religious) <- c("lat","lng","type","distance")
+    religious <- religious[!duplicated(religious),]
+    religious$site <- site$`Facility Id`
+    religious <- subset(religious,religious$distance<=r)
+    locations <- rbind(religious,locations)
+  }
+  
+}
+```
+
+```{r}
+for (a in 1:nrow(seq)) {
+  site <- seq[a,]
+  
+  category <- c("bank","city_hall","courthouse","police","post_office",
+              "fire_station")
+  essential <- data.frame(
+    lat = numeric(),
+    lng = numeric(),
+    type = character(),
+    distance = numeric()
+  )
+  
+  for (i in category) {
+    request <- google_places(
+      location=c(site$Latitude,site$Longitude),
+      rankby='distance',
+      place_type=i)
+    essential <- rbind(request$results$geometry$location,essential)
+    
+    while (exists(addQuotes(request$next_place_token))) {
+      request <- google_places(
+      location=c(site$Latitude,site$Longitude),
+      rankby='distance',
+      place_type=i,
+      page_token=request$next_page_token)
+      
+      essential <- rbind(request$results$geometry$location,essential)
+    }
+  }
+  
+  if (nrow(essential)>0) {
+    essential$type <- c("Essential Services")
+    essential$distance <- distHaversine(cbind(essential$lng,essential$lat),                                            cbind(site$Longitude,site$Latitude))
+    
+    colnames(essential) <- c("lat","lng","type","distance")
+    essential <- essential[!duplicated(essential),]
+    essential$site <- site$`Facility Id`
+    essential <- subset(essential,essential$distance<=r)
+    locations <- rbind(essential,locations)
+  }
+  
+}
+```
+
+```{r}
+locations$type <- as.factor(locations$type)
+locations$site <- as.factor(locations$site)
+
+library("dplyr")
+library("tidyverse")
+by_site <- locations %>% 
+  count(`type`,site) %>% 
+  group_by(`type`) %>% 
+  mutate(prop = prop.table(n))
+
+# by_type <- locations %>% 
+#   count(type) %>% 
+#   group_by(type) %>% 
+#   mutate(prop = prop.table(n))
+```
+
+```{r}
+locations %>%
+      count(site, type, state) %>%
+      filter(state == "TX") 
+```
+
+```{r}
+library("stateabbr")
+
+locations$state <- abbr2name(locations$state)
+
+```
+
+```{r}
+write.csv(locations,"C:/Users/Emily/OneDrive/Documents/GitHub/24-fall-EFUGH/Fugh_Capstone/data/locations.csv")
+
+```
+
+```{r}
+library("tidyverse")
+library("hrbrthemes")
+library("viridis")
+
+by_site %>%
+  ggplot( aes(x=type, y=n, fill=type)) +
+    geom_boxplot() +
+    scale_fill_viridis(discrete = TRUE, alpha=0.6) +
+    geom_jitter(color="black", size=0.4, alpha=0.9) +
+    theme(
+      legend.position="none",
+      axis.text.x = element_text(angle=45,hjust=.8),
+      plot.title = element_text(size=11)
+    ) +
+    xlab("")
+```
+
+```{r}
+library("ggplot2")
+site <- seq[2,]
+
+ggmap(get_map(location=c(lon=site$Longitude,lat=site$Latitude),
+          zoom="auto",
+          scale="auto",
+          maptype='terrain',
+          color='bw')
+) +
+  geom_point(data=site,
+             aes(x=Longitude,y=Latitude),
+             size=5,
+             shape=18,
+             color='black') +
+  geom_point(data=subset(locations,locations$site==1010508),
+             aes(x=lng,y=lat,color=type),
+             size=2) +
+  scale_color_manual(values=c("Medical Services"='#0074D9',"Schools"="#FF4136","Social Locations"='#2ECC40',"Stores"='#FFDC00',"Essential Services"='#F012BE', "Places of Worship"='#39CCCC',"Transportation"="#B10DC9")) +
+  labs(color="Category")
+```
